@@ -33,13 +33,6 @@ export const IDENTITY_REGISTRY_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  {
-    inputs: [{ name: "_userAddress", type: "address" }],
-    name: "identity",
-    outputs: [{ name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
-  },
 ] as const;
 
 export const PROPERTY_SALE_ABI = [

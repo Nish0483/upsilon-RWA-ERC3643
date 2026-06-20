@@ -1,13 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useReadContract } from "wagmi";
 import { Shield, CheckCircle2, AlertCircle, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import { fetchKyc, submitKyc, verifyKyc, KycRecord } from "@/lib/api";
 import { useIdentityVerified } from "@/hooks/useIdentityVerified";
-import { IDENTITY_REGISTRY_ABI, deployments } from "@/lib/contracts";
-
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+import { deployments } from "@/lib/contracts";
 
 const countries = [
   { name: "India", code: 356 },
@@ -30,17 +27,6 @@ function explorerAddressUrl(chainId: number, address: string): string {
 export default function KycPage() {
   const { address, isConnected, isVerified, isWrongChain, targetChainId, refetch, isLoading } =
     useIdentityVerified();
-
-  // The user's wallet never sends a tx (the agent does), so link to their
-  // on-chain identity contract — that's what actually holds the KYC claim.
-  const { data: identityAddress } = useReadContract({
-    address: deployments.identityRegistry as `0x${string}`,
-    abi: IDENTITY_REGISTRY_ABI,
-    functionName: "identity",
-    args: address ? [address] : undefined,
-    chainId: targetChainId,
-    query: { enabled: isConnected && !!address && isVerified && !isWrongChain },
-  });
   const [kyc, setKyc] = useState<KycRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -180,16 +166,14 @@ export default function KycPage() {
             <p className="text-sm text-zinc-500 mt-0.5">
               Your wallet is registered in the Identity Registry. You can invest and receive security tokens.
             </p>
-            {typeof identityAddress === "string" && identityAddress !== ZERO_ADDRESS && (
-              <a
-                href={explorerAddressUrl(targetChainId, identityAddress)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 mt-2"
-              >
-                View identity contract on explorer <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
+            <a
+              href={explorerAddressUrl(targetChainId, deployments.identityRegistry)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 mt-2"
+            >
+              View on explorer <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
         </div>
       )}
