@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shield, CheckCircle2, AlertCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { Shield, CheckCircle2, AlertCircle, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import { fetchKyc, submitKyc, verifyKyc, KycRecord } from "@/lib/api";
 import { useIdentityVerified } from "@/hooks/useIdentityVerified";
 
@@ -12,6 +12,16 @@ const countries = [
   { name: "Germany", code: 276 },
   { name: "Singapore", code: 702 },
 ];
+
+const EXPLORERS: Record<number, string> = {
+  1: "https://etherscan.io",
+  11155111: "https://sepolia.etherscan.io",
+};
+
+function explorerAddressUrl(chainId: number, address: string): string {
+  const base = EXPLORERS[chainId] ?? "https://sepolia.etherscan.io";
+  return `${base}/address/${address}`;
+}
 
 export default function KycPage() {
   const { address, isConnected, isVerified, isWrongChain, targetChainId, refetch, isLoading } =
@@ -67,14 +77,15 @@ export default function KycPage() {
   async function handleQuickVerify() {
     if (!address) return;
     setLoading(true);
+    setPolling(true); // show the pending state immediately, before the request resolves
     setError("");
     try {
       const record = await verifyKyc(address, form.countryCode);
       setKyc(record);
-      setPolling(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Verification failed");
       setLoading(false);
+      setPolling(false);
     }
   }
 
@@ -82,14 +93,15 @@ export default function KycPage() {
     e.preventDefault();
     if (!address) return;
     setLoading(true);
+    setPolling(true); // show the pending state immediately, before the request resolves
     setError("");
     try {
       const record = await submitKyc({ walletAddress: address, ...form });
       setKyc(record);
-      setPolling(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Submission failed");
       setLoading(false);
+      setPolling(false);
     }
   }
 
@@ -153,6 +165,16 @@ export default function KycPage() {
             <p className="text-sm text-zinc-500 mt-0.5">
               Your wallet is registered in the Identity Registry. You can invest and receive security tokens.
             </p>
+            {address && (
+              <a
+                href={explorerAddressUrl(targetChainId, address)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 mt-2"
+              >
+                View on explorer <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
         </div>
       )}
