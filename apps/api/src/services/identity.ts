@@ -5,6 +5,13 @@ import deployments from "../deployments.json";
 
 const KYC_CLAIM_TOPIC = 1n;
 
+// Generous gas caps so we can submit all three txs up front without calling
+// eth_estimateGas (which would revert for addClaim/register before the identity
+// contract is mined). You only pay for gas actually used, not the cap.
+const CREATE_GAS = 1_200_000n;
+const CLAIM_GAS = 600_000n;
+const REGISTER_GAS = 500_000n;
+
 async function confirmTx(tx: ethers.ContractTransactionResponse): Promise<void> {
   await tx.wait();
 }
@@ -112,37 +119,66 @@ export async function registerIdentityOnChain(
     identityAddress = await idFactory.getIdentity(walletAddress);
   }
 
-  if (identityAddress === ethers.ZeroAddress) {
-    const fees = await bumpedFees();
-    if (walletIsAgent) {
-      identityAddress = await idFactory.createIdentity.staticCall(walletAddress, salt);
-      await confirmTx(await idFactory.createIdentity(walletAddress, salt, fees));
-    } else {
-      const managementKey = ethers.keccak256(
-        ethers.AbiCoder.defaultAbiCoder().encode(["address"], [agentAddress])
-      );
-      identityAddress = await idFactory.createIdentityWithManagementKeys.staticCall(
-        walletAddress,
-        salt,
-        [managementKey]
-      );
-      await confirmTx(
-        await idFactory.createIdentityWithManagementKeys(walletAddress, salt, [managementKey], fees)
-      );
-    }
-  }
-
-  const identity = new ethers.Contract(
-    identityAddress,
-    OnchainID.contracts.Identity.abi,
-    agent
+  const managementKey = ethers.keccak256(
+    ethers.AbiCoder.defaultAbiCoder().encode(["address"], [agentAddress])
   );
 
-  // addClaim and registerIdentity both only depend on the identity existing
-  // (created above) — not on each other. Send them together with explicit
-  // sequential nonces and wait once, saving a full block of latency.
-  const needsClaim =
-    (await identity.getClaimIdsByTopic(KYC_CLAIM_TOPIC)).length === 0;
+  // ── Fast path: brand-new identity ──────────────────────────────────────
+  // Submit create + addClaim + registerIdentity together with consecutive
+  // nonces. The EVM executes a wallet's txs in nonce order, so they resolve in
+  // sequence within one or two blocks instead of waiting a block per step.
+  if (identityAddress === ethers.ZeroAddress) {
+    const fees = await bumpedFees();
+    const startNonce = await agent.getNonce("pending");
+
+    // Predict the deterministic identity address (static call — no tx).
+    identityAddress = walletIsAgent
+      ? await idFactory.createIdentity.staticCall(walletAddress, salt)
+      : await idFactory.createIdentityWithManagementKeys.staticCall(walletAddress, salt, [managementKey]);
+
+    const identity = new ethers.Contract(identityAddress, OnchainID.contracts.Identity.abi, agent);
+    const { signature, claimData } = await buildClaimSignature(identityAddress, claimSigner);
+
+    const createTx = walletIsAgent
+      ? await idFactory.createIdentity(walletAddress, salt, {
+          ...fees,
+          nonce: startNonce,
+          gasLimit: CREATE_GAS,
+        })
+      : await idFactory.createIdentityWithManagementKeys(walletAddress, salt, [managementKey], {
+          ...fees,
+          nonce: startNonce,
+          gasLimit: CREATE_GAS,
+        });
+
+    const claimTx = await identity.addClaim(
+      KYC_CLAIM_TOPIC,
+      1,
+      deployments.claimIssuer,
+      signature,
+      claimData,
+      "",
+      { ...fees, nonce: startNonce + 1, gasLimit: CLAIM_GAS }
+    );
+
+    const registerTx = await identityRegistry.registerIdentity(walletAddress, identityAddress, countryCode, {
+      ...fees,
+      nonce: startNonce + 2,
+      gasLimit: REGISTER_GAS,
+    });
+
+    await Promise.all([createTx.wait(), claimTx.wait(), registerTx.wait()]);
+
+    if (!(await isVerifiedOnChain(walletAddress))) {
+      throw new Error("On-chain identity registration failed");
+    }
+    return { identityAddress, alreadyVerified: false };
+  }
+
+  // ── Slow path: identity already exists (created/registered earlier) ─────
+  // Finish whatever step is missing. These can still be batched together.
+  const identity = new ethers.Contract(identityAddress, OnchainID.contracts.Identity.abi, agent);
+  const needsClaim = (await identity.getClaimIdsByTopic(KYC_CLAIM_TOPIC)).length === 0;
 
   if (needsClaim || needsRegistry) {
     const fees = await bumpedFees();
