@@ -17,8 +17,30 @@ function requireEnv(name: string): string {
   return value;
 }
 
+let cachedProvider: ethers.JsonRpcProvider | undefined;
+
 function getProvider() {
-  return new ethers.JsonRpcProvider(requireEnv("RPC_URL"));
+  if (!cachedProvider) {
+    cachedProvider = new ethers.JsonRpcProvider(requireEnv("RPC_URL"));
+    // Default is 4000ms — drop it so tx.wait() detects mined receipts faster.
+    cachedProvider.pollingInterval = 1000;
+  }
+  return cachedProvider;
+}
+
+// Bump the priority fee so transactions get included in the next block instead
+// of lingering in a public-node mempool. Returns undefined if the node doesn't
+// report EIP-1559 fee data (caller falls back to ethers' defaults).
+async function bumpedFees(): Promise<ethers.Overrides> {
+  const fee = await getProvider().getFeeData();
+  if (fee.maxFeePerGas && fee.maxPriorityFeePerGas) {
+    const priority = fee.maxPriorityFeePerGas * 2n;
+    return {
+      maxPriorityFeePerGas: priority,
+      maxFeePerGas: fee.maxFeePerGas + priority,
+    };
+  }
+  return {};
 }
 
 function getAgentSigner() {
@@ -43,14 +65,10 @@ export async function isVerifiedOnChain(walletAddress: string): Promise<boolean>
   return registry.isVerified(walletAddress);
 }
 
-async function addKycClaimIfNeeded(
-  identity: ethers.Contract,
+async function buildClaimSignature(
   identityAddress: string,
   claimSigner: ethers.Wallet
-): Promise<void> {
-  const claimIds: string[] = await identity.getClaimIdsByTopic(KYC_CLAIM_TOPIC);
-  if (claimIds.length > 0) return;
-
+): Promise<{ signature: string; claimData: string }> {
   const claimData = ethers.hexlify(ethers.toUtf8Bytes("KYC approved (demo)"));
   const dataHash = ethers.keccak256(
     ethers.AbiCoder.defaultAbiCoder().encode(
@@ -59,9 +77,7 @@ async function addKycClaimIfNeeded(
     )
   );
   const signature = await claimSigner.signMessage(ethers.getBytes(dataHash));
-  await confirmTx(
-    await identity.addClaim(KYC_CLAIM_TOPIC, 1, deployments.claimIssuer, signature, claimData, "")
-  );
+  return { signature, claimData };
 }
 
 export async function registerIdentityOnChain(
@@ -101,9 +117,10 @@ export async function registerIdentityOnChain(
   }
 
   if (identityAddress === ethers.ZeroAddress) {
+    const fees = await bumpedFees();
     if (walletIsAgent) {
       identityAddress = await idFactory.createIdentity.staticCall(walletAddress, salt);
-      await confirmTx(await idFactory.createIdentity(walletAddress, salt));
+      await confirmTx(await idFactory.createIdentity(walletAddress, salt, fees));
     } else {
       const managementKey = ethers.keccak256(
         ethers.AbiCoder.defaultAbiCoder().encode(["address"], [agentAddress])
@@ -114,7 +131,7 @@ export async function registerIdentityOnChain(
         [managementKey]
       );
       await confirmTx(
-        await idFactory.createIdentityWithManagementKeys(walletAddress, salt, [managementKey])
+        await idFactory.createIdentityWithManagementKeys(walletAddress, salt, [managementKey], fees)
       );
     }
   }
@@ -125,12 +142,41 @@ export async function registerIdentityOnChain(
     agent
   );
 
-  await addKycClaimIfNeeded(identity, identityAddress, claimSigner);
+  // addClaim and registerIdentity both only depend on the identity existing
+  // (created above) — not on each other. Send them together with explicit
+  // sequential nonces and wait once, saving a full block of latency.
+  const needsClaim =
+    (await identity.getClaimIdsByTopic(KYC_CLAIM_TOPIC)).length === 0;
 
-  if (needsRegistry) {
-    await confirmTx(
-      await identityRegistry.registerIdentity(walletAddress, identityAddress, countryCode)
-    );
+  if (needsClaim || needsRegistry) {
+    const fees = await bumpedFees();
+    let nonce = await agent.getNonce("pending");
+    const pending: Promise<void>[] = [];
+
+    if (needsClaim) {
+      const { signature, claimData } = await buildClaimSignature(identityAddress, claimSigner);
+      pending.push(
+        confirmTx(
+          await identity.addClaim(KYC_CLAIM_TOPIC, 1, deployments.claimIssuer, signature, claimData, "", {
+            ...fees,
+            nonce: nonce++,
+          })
+        )
+      );
+    }
+
+    if (needsRegistry) {
+      pending.push(
+        confirmTx(
+          await identityRegistry.registerIdentity(walletAddress, identityAddress, countryCode, {
+            ...fees,
+            nonce: nonce++,
+          })
+        )
+      );
+    }
+
+    await Promise.all(pending);
   }
 
   if (!(await isVerifiedOnChain(walletAddress))) {
