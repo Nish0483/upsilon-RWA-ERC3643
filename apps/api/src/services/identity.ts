@@ -28,19 +28,15 @@ function getProvider() {
   return cachedProvider;
 }
 
-// Bump the priority fee so transactions get included in the next block instead
-// of lingering in a public-node mempool. Returns undefined if the node doesn't
-// report EIP-1559 fee data (caller falls back to ethers' defaults).
+// Fetch the live network gas price and pay 1.5x it. A plain legacy gasPrice is
+// simpler and more reliable here than EIP-1559 max/priority fees, since public
+// nodes report a near-zero suggested tip that leaves txs stuck for many blocks.
+const FALLBACK_GAS_PRICE = ethers.parseUnits("2", "gwei");
+
 async function bumpedFees(): Promise<ethers.Overrides> {
   const fee = await getProvider().getFeeData();
-  if (fee.maxFeePerGas && fee.maxPriorityFeePerGas) {
-    const priority = fee.maxPriorityFeePerGas * 2n;
-    return {
-      maxPriorityFeePerGas: priority,
-      maxFeePerGas: fee.maxFeePerGas + priority,
-    };
-  }
-  return {};
+  const live = fee.gasPrice ?? FALLBACK_GAS_PRICE;
+  return { gasPrice: (live * 3n) / 2n };
 }
 
 function getAgentSigner() {
