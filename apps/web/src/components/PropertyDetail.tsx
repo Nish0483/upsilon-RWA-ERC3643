@@ -40,7 +40,7 @@ export function PropertyDetail({ property }: { property: Property }) {
 
   const onChainEnabled = property.slug === "koramangala-skyrise" && isTrexDeployed();
   const validAmount = Number.isFinite(amount) && amount > 0;
-  const tokenAmountWei = validAmount ? parseEther(String(amount)) : 0n;
+  const tokenAmountWei = validAmount ? parseEther(String(amount)) : BigInt(0);
   const ethCost = calcEthCost(amount);
 
   const { data: tokensAvailable } = useReadContract({

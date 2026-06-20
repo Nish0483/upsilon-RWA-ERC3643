@@ -64,7 +64,7 @@ export { deployments };
 const ZERO = "0x0000000000000000000000000000000000000000";
 
 export function calcEthCost(tokenAmount: number): bigint {
-  if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) return 0n;
+  if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) return BigInt(0);
   const price = BigInt(deployments.tokenPriceWei || parseEther("0.01").toString());
   // Match on-chain: (tokenAmountWei * tokenPriceWei) / 1e18
   return (parseEther(String(tokenAmount)) * price) / BigInt(10 ** 18);
