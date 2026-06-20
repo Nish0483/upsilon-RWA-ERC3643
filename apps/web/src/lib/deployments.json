@@ -1,0 +1,17 @@
+{
+  "chainId": 11155111,
+  "trexVersion": "4.1.3",
+  "identityRegistry": "0x1481fb95Ebeb56460E9109b7B97273AC19dfAe38",
+  "compliance": "0x6709f40e5f98091d1c6Ee04f1C78aBc25a69FCC7",
+  "token": "0x7b549890BEEFfeC4fA8f54B87e735e84642912A1",
+  "propertySale": "0xa3669E46Bf27B24808A685FAe38589399E6D01B7",
+  "treasury": "0x75EF27c73bf90528350A7FF7365A000B7A5b0cdF",
+  "claimIssuer": "0xFBC1ED6cf848d306B2Bf38F32B92DD9f8045ec49",
+  "identityFactory": "0x2997e6853EfAaa9ca1EdACcdB8aC9BaF32A5e653",
+  "claimTopic": "1",
+  "tokenSymbol": "KORA",
+  "tokenName": "Koramangala Skyrise",
+  "tokenPriceWei": "10000000000000000",
+  "deployer": "0x75EF27c73bf90528350A7FF7365A000B7A5b0cdF",
+  "investors": []
+}

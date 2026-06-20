@@ -1,0 +1,22 @@
+{
+  "name": "rwa-real-estate",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:api": "npm run dev -w apps/api",
+    "build": "npm run build -w packages/contracts && npm run build -w apps/api && npm run build -w apps/web",
+    "compile": "npm run compile -w packages/contracts",
+    "deploy:local": "npm run deploy:local -w packages/contracts",
+    "deploy:sepolia": "npm run deploy:sepolia -w packages/contracts",
+    "test:contracts": "npm run test -w packages/contracts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

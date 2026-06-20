@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-surface text-zinc-100 min-h-screen;
+  }
+
+  ::selection {
+    @apply bg-accent/30 text-white;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-surface-raised/80 backdrop-blur-xl border border-surface-border;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg
+      bg-accent text-surface font-medium text-sm
+      hover:bg-accent/90 transition-colors duration-200
+      disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+      text-zinc-400 text-sm font-medium
+      hover:text-zinc-100 hover:bg-surface-overlay transition-colors duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-lg bg-surface-overlay border border-surface-border
+      text-zinc-100 placeholder:text-zinc-600 text-sm
+      focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30
+      transition-colors duration-200;
+  }
+
+  .card {
+    @apply glass rounded-2xl p-6;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* Subtle grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(39, 39, 42, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 39, 42, 0.3) 1px, transparent 1px);
+  background-size: 64px 64px;
+}

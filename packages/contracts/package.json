@@ -1,0 +1,25 @@
+{
+  "name": "@rwa/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "node": "hardhat node",
+    "sync:vendor": "bash scripts/sync-vendor.sh"
+  },
+  "dependencies": {
+    "@erc3643org/erc-3643": "4.1.3",
+    "@onchain-id/solidity": "2.2.1",
+    "@openzeppelin/contracts": "^5.2.0",
+    "@openzeppelin/contracts-upgradeable": "4.9.6"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.18",
+    "typescript": "^5.7.3",
+    "ts-node": "^10.9.2"
+  }
+}
