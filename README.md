@@ -3,6 +3,8 @@
 Fractional real estate ownership powered by **official ERC-3643 T-REX** security tokens. Investors pay **native ETH** on the primary market
 
 > **Demo / portfolio project** — KYC is simulated via an API shim (ONCHAINID claim + Identity Registry). Not production-ready; no third-party KYC vendor.
+>
+> The sample property (**Koramangala Skyrise**, token `KORA`) is based on a Bangalore-based real estate project included for demonstration purposes.
 
 ## Architecture
 
@@ -22,11 +24,13 @@ Fractional real estate ownership powered by **official ERC-3643 T-REX** security
 
 | Component | Purpose |
 |---|---|
-| **T-REX Token** (`KORA`) | ERC-3643 security token — Koramangala Skyrise |
+| **T-REX Token** (`KORA`) | ERC-3643 security token — Koramangala Skyrise (Bangalore) |
 | **Identity Registry** | On-chain KYC — `isVerified()` gate |
 | **Modular Compliance** | Transfer rules enforced on every move |
 | **PropertySale** | Primary market — pay ETH → receive KORA |
 | **ONCHAINID** | Identity contracts + demo claim issuer |
+
+**Deployment vs vendor sources:** The deploy script (`scripts/deploy.ts`, `scripts/lib/trex.ts`) uses T-REX and ONCHAINID artifacts directly from npm — `@erc3643org/erc-3643` (v4.1.3) and `@onchain-id/solidity` (v2.2.1). Copies under `contracts/vendor/` are included **for reference and local inspection only**; they are not what gets deployed.
 
 ## Quick Start
 
@@ -85,9 +89,9 @@ Upsilon/
 ├── packages/contracts/
 │   ├── contracts/
 │   │   ├── PropertySale.sol
-│   │   └── vendor/
-│   │       ├── erc3643/       # T-REX (Token, IdentityRegistry, Compliance, …)
-│   │       └── onchain-id/    # ONCHAINID (Identity, ClaimIssuer, …)
+│   │   └── vendor/            # Reference copies only (deploy uses npm packages)
+│   │       ├── erc3643/       # @erc3643org/erc-3643
+│   │       └── onchain-id/    # @onchain-id/solidity
 │   ├── scripts/lib/trex.ts
 │   └── test/
 ├── apps/
