@@ -49,13 +49,14 @@ app.get("/api/stats", (_req, res) => {
 // ─── KYC ──────────────────────────────────────────────────────────
 
 async function approveKyc(record: KycRequest) {
-  await registerIdentityOnChain(record.walletAddress, record.countryCode);
+  const { txHash } = await registerIdentityOnChain(record.walletAddress, record.countryCode);
   const onChain = await isVerifiedOnChain(record.walletAddress);
   if (!onChain) {
     throw new Error("On-chain identity registration failed");
   }
   record.status = "approved";
   record.reviewedAt = new Date().toISOString();
+  if (txHash) record.txHash = txHash;
 }
 
 app.get("/api/kyc/:wallet", async (req, res) => {

@@ -35,6 +35,7 @@ export interface KycRecord {
   walletAddress?: string;
   fullName?: string;
   submittedAt?: string;
+  txHash?: string;
 }
 
 export async function fetchProperties(): Promise<Property[]> {

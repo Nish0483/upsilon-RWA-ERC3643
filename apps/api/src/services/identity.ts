@@ -86,7 +86,7 @@ async function buildClaimSignature(
 export async function registerIdentityOnChain(
   walletAddress: string,
   countryCode = 356
-): Promise<{ identityAddress: string; alreadyVerified: boolean }> {
+): Promise<{ identityAddress: string; alreadyVerified: boolean; txHash?: string }> {
   if (!deployments.identityFactory || !deployments.identityRegistry) {
     throw new Error("T-REX not deployed — run npm run deploy:sepolia");
   }
@@ -172,13 +172,15 @@ export async function registerIdentityOnChain(
     if (!(await isVerifiedOnChain(walletAddress))) {
       throw new Error("On-chain identity registration failed");
     }
-    return { identityAddress, alreadyVerified: false };
+    return { identityAddress, alreadyVerified: false, txHash: registerTx.hash };
   }
 
   // ── Slow path: identity already exists (created/registered earlier) ─────
   // Finish whatever step is missing. These can still be batched together.
   const identity = new ethers.Contract(identityAddress, OnchainID.contracts.Identity.abi, agent);
   const needsClaim = (await identity.getClaimIdsByTopic(KYC_CLAIM_TOPIC)).length === 0;
+
+  let txHash: string | undefined;
 
   if (needsClaim || needsRegistry) {
     const fees = await bumpedFees();
@@ -187,25 +189,21 @@ export async function registerIdentityOnChain(
 
     if (needsClaim) {
       const { signature, claimData } = await buildClaimSignature(identityAddress, claimSigner);
-      pending.push(
-        confirmTx(
-          await identity.addClaim(KYC_CLAIM_TOPIC, 1, deployments.claimIssuer, signature, claimData, "", {
-            ...fees,
-            nonce: nonce++,
-          })
-        )
+      const claimTx = await identity.addClaim(
+        KYC_CLAIM_TOPIC, 1, deployments.claimIssuer, signature, claimData, "",
+        { ...fees, nonce: nonce++ }
       );
+      txHash = claimTx.hash;
+      pending.push(confirmTx(claimTx));
     }
 
     if (needsRegistry) {
-      pending.push(
-        confirmTx(
-          await identityRegistry.registerIdentity(walletAddress, identityAddress, countryCode, {
-            ...fees,
-            nonce: nonce++,
-          })
-        )
-      );
+      const registerTx = await identityRegistry.registerIdentity(walletAddress, identityAddress, countryCode, {
+        ...fees,
+        nonce: nonce++,
+      });
+      txHash = registerTx.hash; // prefer the registration tx hash
+      pending.push(confirmTx(registerTx));
     }
 
     await Promise.all(pending);
@@ -215,5 +213,5 @@ export async function registerIdentityOnChain(
     throw new Error("On-chain identity registration failed");
   }
 
-  return { identityAddress, alreadyVerified: false };
+  return { identityAddress, alreadyVerified: false, txHash };
 }

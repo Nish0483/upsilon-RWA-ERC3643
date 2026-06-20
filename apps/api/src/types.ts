@@ -28,6 +28,7 @@ export interface KycRequest {
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
   reviewedAt?: string;
+  txHash?: string;
 }
 
 export interface Investment {

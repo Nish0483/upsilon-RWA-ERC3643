@@ -24,6 +24,11 @@ function explorerAddressUrl(chainId: number, address: string): string {
   return `${base}/address/${address}`;
 }
 
+function explorerTxUrl(chainId: number, txHash: string): string {
+  const base = EXPLORERS[chainId] ?? "https://sepolia.etherscan.io";
+  return `${base}/tx/${txHash}`;
+}
+
 export default function KycPage() {
   const { address, isConnected, isVerified, isWrongChain, targetChainId, refetch, isLoading } =
     useIdentityVerified();
@@ -167,12 +172,16 @@ export default function KycPage() {
               Your wallet is registered in the Identity Registry. You can invest and receive security tokens.
             </p>
             <a
-              href={explorerAddressUrl(targetChainId, deployments.identityRegistry)}
+              href={
+                kyc?.txHash
+                  ? explorerTxUrl(targetChainId, kyc.txHash)
+                  : explorerAddressUrl(targetChainId, deployments.identityRegistry)
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1 mt-2"
             >
-              View on explorer <ExternalLink className="w-3 h-3" />
+              {kyc?.txHash ? "View transaction on explorer" : "View Identity Registry on explorer"} <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </div>
