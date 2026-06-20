@@ -18,6 +18,9 @@ app.use(express.json());
 const kycRequests: KycRequest[] = [];
 const investments: Investment[] = [];
 
+// Wallets currently being registered on-chain (prevents duplicate submissions)
+const kycInFlight = new Set<string>();
+
 // ─── Properties ───────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => {
@@ -56,6 +59,25 @@ async function approveKyc(record: KycRequest) {
   }
   record.status = "approved";
   record.reviewedAt = new Date().toISOString();
+}
+
+// Kicks off on-chain registration in the background. The frontend polls the
+// on-chain `isVerified` to learn when it completes, so we never block the HTTP
+// response on the (slow) chain transactions.
+function startKycRegistration(record: KycRequest): void {
+  const key = record.walletAddress.toLowerCase();
+  if (kycInFlight.has(key)) return;
+  kycInFlight.add(key);
+  record.status = "pending";
+
+  approveKyc(record)
+    .catch((err) => {
+      record.status = "pending";
+      console.error(`KYC on-chain registration failed for ${key}:`, err);
+    })
+    .finally(() => {
+      kycInFlight.delete(key);
+    });
 }
 
 app.get("/api/kyc/:wallet", async (req, res) => {
@@ -106,16 +128,8 @@ app.post("/api/kyc", async (req, res) => {
 
   if (!existing) kycRequests.push(record);
 
-  try {
-    await approveKyc(record);
-    res.status(201).json({ ...record, onChainVerified: true });
-  } catch (err) {
-    record.status = "pending";
-    res.status(502).json({
-      error: err instanceof Error ? err.message : "On-chain registration failed",
-      record,
-    });
-  }
+  startKycRegistration(record);
+  res.status(202).json({ ...record, processing: true });
 });
 
 // Dev shortcut: instantly verify any connected wallet
@@ -143,16 +157,8 @@ app.post("/api/kyc/verify", async (req, res) => {
     kycRequests.push(record);
   }
 
-  try {
-    await approveKyc(record);
-    res.json({ ...record, onChainVerified: true });
-  } catch (err) {
-    record.status = "pending";
-    res.status(502).json({
-      error: err instanceof Error ? err.message : "On-chain registration failed",
-      record,
-    });
-  }
+  startKycRegistration(record);
+  res.status(202).json({ ...record, processing: true });
 });
 
 app.get("/api/kyc", (_req, res) => {

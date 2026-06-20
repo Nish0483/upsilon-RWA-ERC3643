@@ -6,7 +6,7 @@ import deployments from "../deployments.json";
 const KYC_CLAIM_TOPIC = 1n;
 
 async function confirmTx(tx: ethers.ContractTransactionResponse): Promise<void> {
-  await tx.wait(2);
+  await tx.wait();
 }
 
 function requireEnv(name: string): string {
