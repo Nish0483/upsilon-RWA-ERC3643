@@ -8,7 +8,7 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
-  title: "Upsilon — Real Estate RWA",
+  title: "Upsilon-Blocks-RWA",
   description: "Fractional real estate ownership powered by ERC-3643 security tokens",
 };
 
