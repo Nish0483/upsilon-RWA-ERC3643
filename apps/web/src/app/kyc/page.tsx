@@ -24,7 +24,14 @@ export default function KycPage() {
 
   useEffect(() => {
     if (!address) return;
-    fetchKyc(address).then(setKyc).catch(() => setKyc({ status: "none" }));
+    fetchKyc(address)
+      .then((record) => {
+        setKyc(record);
+        // A request is already in flight (e.g. user reloaded the page) — show
+        // the pending state and resume watching until it verifies on-chain.
+        if (record.status === "pending") setPolling(true);
+      })
+      .catch(() => setKyc({ status: "none" }));
   }, [address]);
 
   // After triggering registration, poll the on-chain isVerified until it flips.
@@ -86,6 +93,10 @@ export default function KycPage() {
     }
   }
 
+  // In-flight verification: either we're actively polling, or a previously
+  // submitted request is still pending on the backend.
+  const isPending = polling || kyc?.status === "pending";
+
   if (!isConnected) {
     return (
       <div className="max-w-lg mx-auto px-6 py-24 text-center">
@@ -118,7 +129,7 @@ export default function KycPage() {
         </div>
       )}
 
-      {polling && !isVerified && !isWrongChain && (
+      {isPending && !isVerified && !isWrongChain && (
         <div className="card flex items-center gap-4 border-amber-400/20 mb-6">
           <Loader2 className="w-8 h-8 text-amber-400 shrink-0 animate-spin" />
           <div>
@@ -130,7 +141,7 @@ export default function KycPage() {
         </div>
       )}
 
-      {isLoading && !isWrongChain && !polling && (
+      {isLoading && !isWrongChain && !isPending && (
         <div className="card text-sm text-zinc-500 mb-6">Checking on-chain identity…</div>
       )}
 
@@ -146,7 +157,7 @@ export default function KycPage() {
         </div>
       )}
 
-      {!isVerified && !isWrongChain && !isLoading && (
+      {!isVerified && !isWrongChain && !isLoading && !isPending && (
         <div className="mb-6">
           <button
             type="button"
@@ -162,7 +173,7 @@ export default function KycPage() {
         </div>
       )}
 
-      {!isVerified && !isWrongChain && (
+      {!isVerified && !isWrongChain && !isPending && (
         <form onSubmit={handleSubmit} className="card space-y-4">
           <div>
             <label className="text-xs text-zinc-500 mb-1.5 block">Full Name</label>
