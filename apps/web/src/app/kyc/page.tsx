@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shield, CheckCircle2, AlertCircle, AlertTriangle } from "lucide-react";
+import { Shield, CheckCircle2, AlertCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { fetchKyc, submitKyc, verifyKyc, KycRecord } from "@/lib/api";
 import { useIdentityVerified } from "@/hooks/useIdentityVerified";
 
@@ -18,6 +18,7 @@ export default function KycPage() {
     useIdentityVerified();
   const [kyc, setKyc] = useState<KycRecord | null>(null);
   const [loading, setLoading] = useState(false);
+  const [polling, setPolling] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", country: "India", countryCode: 356 });
   const [error, setError] = useState("");
 
@@ -26,6 +27,36 @@ export default function KycPage() {
     fetchKyc(address).then(setKyc).catch(() => setKyc({ status: "none" }));
   }, [address]);
 
+  // After triggering registration, poll the on-chain isVerified until it flips.
+  useEffect(() => {
+    if (!polling) return;
+
+    const stop = () => {
+      setPolling(false);
+      setLoading(false);
+    };
+
+    const interval = setInterval(async () => {
+      const { data } = await refetch();
+      if (data === true) {
+        clearInterval(interval);
+        clearTimeout(timeout);
+        stop();
+      }
+    }, 4000);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      setError("Still processing on-chain — check back in a moment.");
+      stop();
+    }, 120_000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [polling, refetch]);
+
   async function handleQuickVerify() {
     if (!address) return;
     setLoading(true);
@@ -33,10 +64,9 @@ export default function KycPage() {
     try {
       const record = await verifyKyc(address, form.countryCode);
       setKyc(record);
-      await refetch();
+      setPolling(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Verification failed");
-    } finally {
       setLoading(false);
     }
   }
@@ -49,10 +79,9 @@ export default function KycPage() {
     try {
       const record = await submitKyc({ walletAddress: address, ...form });
       setKyc(record);
-      await refetch();
+      setPolling(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Submission failed");
-    } finally {
       setLoading(false);
     }
   }
@@ -89,7 +118,19 @@ export default function KycPage() {
         </div>
       )}
 
-      {isLoading && !isWrongChain && (
+      {polling && !isVerified && !isWrongChain && (
+        <div className="card flex items-center gap-4 border-amber-400/20 mb-6">
+          <Loader2 className="w-8 h-8 text-amber-400 shrink-0 animate-spin" />
+          <div>
+            <p className="font-medium text-amber-400">Verification in progress</p>
+            <p className="text-sm text-zinc-500 mt-0.5">
+              Registering your identity on-chain — this takes ~30–60 seconds. You can leave this page open.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isLoading && !isWrongChain && !polling && (
         <div className="card text-sm text-zinc-500 mb-6">Checking on-chain identity…</div>
       )}
 
@@ -110,10 +151,10 @@ export default function KycPage() {
           <button
             type="button"
             onClick={handleQuickVerify}
-            disabled={loading}
+            disabled={loading || polling}
             className="btn-primary w-full"
           >
-            {loading ? "Registering on-chain…" : "Verify instantly (test)"}
+            {loading || polling ? "Registering on-chain…" : "Verify instantly (test)"}
           </button>
           <p className="text-xs text-zinc-600 text-center mt-2">
             Registers your wallet in the on-chain Identity Registry
@@ -170,8 +211,8 @@ export default function KycPage() {
             </p>
           )}
 
-          <button type="submit" className="btn-ghost w-full border border-surface-border" disabled={loading}>
-            {loading ? "Submitting…" : "Submit KYC form"}
+          <button type="submit" className="btn-ghost w-full border border-surface-border" disabled={loading || polling}>
+            {loading || polling ? "Registering on-chain…" : "Submit KYC form"}
           </button>
         </form>
       )}
