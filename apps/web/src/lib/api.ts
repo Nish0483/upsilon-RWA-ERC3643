@@ -1,3 +1,5 @@
+import { fallbackProperties, fallbackStats } from "./fallback-data";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export interface Property {
@@ -36,21 +38,35 @@ export interface KycRecord {
 }
 
 export async function fetchProperties(): Promise<Property[]> {
-  const res = await fetch(`${API_URL}/api/properties`, { next: { revalidate: 30 } });
-  if (!res.ok) throw new Error("Failed to fetch properties");
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/properties`, { next: { revalidate: 30 } });
+    if (!res.ok) throw new Error("Failed to fetch properties");
+    return res.json();
+  } catch {
+    return fallbackProperties;
+  }
 }
 
 export async function fetchProperty(slug: string): Promise<Property> {
-  const res = await fetch(`${API_URL}/api/properties/${slug}`, { next: { revalidate: 30 } });
-  if (!res.ok) throw new Error("Property not found");
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/properties/${slug}`, { next: { revalidate: 30 } });
+    if (!res.ok) throw new Error("Property not found");
+    return res.json();
+  } catch {
+    const property = fallbackProperties.find((p) => p.slug === slug);
+    if (!property) throw new Error("Property not found");
+    return property;
+  }
 }
 
 export async function fetchStats(): Promise<PlatformStats> {
-  const res = await fetch(`${API_URL}/api/stats`, { next: { revalidate: 60 } });
-  if (!res.ok) throw new Error("Failed to fetch stats");
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/stats`, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error("Failed to fetch stats");
+    return res.json();
+  } catch {
+    return fallbackStats;
+  }
 }
 
 export async function fetchKyc(wallet: string): Promise<KycRecord> {
