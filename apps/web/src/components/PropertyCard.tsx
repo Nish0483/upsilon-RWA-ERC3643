@@ -6,8 +6,14 @@ import clsx from "clsx";
 
 const statusStyles = {
   active: "bg-emerald-400/10 text-emerald-400",
-  funded: "bg-zinc-500/10 text-zinc-400",
-  pending: "bg-amber-400/10 text-amber-400",
+  funded: "bg-zinc-500/10 text-zinc-300",
+  pending: "bg-zinc-700/30 text-zinc-500",
+};
+
+const statusLabels = {
+  active: "Available",
+  funded: "Sold",
+  pending: "Not available",
 };
 
 export function PropertyCard({ property }: { property: Property }) {
@@ -25,8 +31,8 @@ export function PropertyCard({ property }: { property: Property }) {
             sizes="(max-width: 768px) 100vw, 33vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent" />
-          <span className={clsx("badge absolute top-4 left-4 capitalize", statusStyles[property.status])}>
-            {property.status}
+          <span className={clsx("badge absolute top-4 left-4", statusStyles[property.status])}>
+            {statusLabels[property.status]}
           </span>
         </div>
 

@@ -13,5 +13,13 @@
   "tokenName": "Koramangala Skyrise",
   "tokenPriceWei": "10000000000000000",
   "deployer": "0x75EF27c73bf90528350A7FF7365A000B7A5b0cdF",
-  "investors": []
+  "investors": [],
+  "secondaryTokenSlug": "ub-city-tower",
+  "secondaryTokenName": "UB City Tower",
+  "secondaryTokenSymbol": "UBCT",
+  "secondaryToken": "0x625d3f15751227915811Be1d1B03249E046274C4",
+  "secondaryCompliance": "0xEFE26Ba706B6808884a13D9E3aA8f4e87D34179f",
+  "secondaryPropertySale": "0x0efBE6d49411F596E2E8417E85A19DAA344823bc",
+  "secondaryTokenPriceWei": "25000000000000000",
+  "multiSale": "0x0F88EcE85CdC89E36912abA692e8585574c5c751"
 }

@@ -1,37 +1,44 @@
 "use client";
 
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContracts } from "wagmi";
 import { Wallet, ShieldCheck, ShieldX, Coins } from "lucide-react";
 import Link from "next/link";
 import deployments from "@/lib/deployments.json";
 import { TOKEN_ABI } from "@/lib/contracts";
 import { formatNumber } from "@/lib/api";
+import { fallbackProperties } from "@/lib/fallback-data";
 import { formatEther } from "viem";
 import { useIdentityVerified } from "@/hooks/useIdentityVerified";
+
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+// Every deployed property token, paired with catalog metadata (name + USD price).
+const tokenDefs = [
+  { address: deployments.token, symbol: deployments.tokenSymbol, name: deployments.tokenName },
+  {
+    address: deployments.secondaryToken,
+    symbol: deployments.secondaryTokenSymbol,
+    name: deployments.secondaryTokenName,
+  },
+].filter((t) => t.address && t.address !== ZERO);
+
+const usdPriceBySymbol: Record<string, number> = Object.fromEntries(
+  fallbackProperties.map((p) => [p.tokenSymbol, p.tokenPrice])
+);
 
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
   const { isVerified, isWrongChain, targetChainId } = useIdentityVerified();
 
-  const { data: balance } = useReadContract({
-    address: deployments.token as `0x${string}`,
-    abi: TOKEN_ABI,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    chainId: deployments.chainId,
-    query: {
-      enabled: !!address && deployments.token !== "0x0000000000000000000000000000000000000000" && !isWrongChain,
-    },
-  });
-
-  const { data: isPaused } = useReadContract({
-    address: deployments.token as `0x${string}`,
-    abi: TOKEN_ABI,
-    functionName: "paused",
-    chainId: deployments.chainId,
-    query: {
-      enabled: deployments.token !== "0x0000000000000000000000000000000000000000" && !isWrongChain,
-    },
+  const { data: balances } = useReadContracts({
+    contracts: tokenDefs.map((t) => ({
+      address: t.address as `0x${string}`,
+      abi: TOKEN_ABI,
+      functionName: "balanceOf",
+      args: address ? [address as `0x${string}`] : undefined,
+      chainId: deployments.chainId,
+    })),
+    query: { enabled: !!address && !isWrongChain },
   });
 
   if (!isConnected) {
@@ -44,8 +51,15 @@ export default function PortfolioPage() {
     );
   }
 
-  const tokenBalance = balance ? Number(formatEther(balance)) : 0;
-  const usdValue = tokenBalance * 10; // $10 per token (Koramangala offering)
+  const holdings = tokenDefs.map((t, i) => {
+    const raw = balances?.[i]?.result as bigint | undefined;
+    const balance = raw ? Number(formatEther(raw)) : 0;
+    const usd = (usdPriceBySymbol[t.symbol] ?? 0) * balance;
+    return { ...t, balance, usd };
+  });
+
+  const owned = holdings.filter((h) => h.balance > 0);
+  const totalValue = holdings.reduce((sum, h) => sum + h.usd, 0);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -61,15 +75,11 @@ export default function PortfolioPage() {
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         <div className="card">
           <p className="text-xs text-zinc-500 mb-1">Total Value</p>
-          <p className="text-2xl font-bold text-zinc-100">
-            ${formatNumber(usdValue)}
-          </p>
+          <p className="text-2xl font-bold text-zinc-100">${formatNumber(totalValue)}</p>
         </div>
         <div className="card">
-          <p className="text-xs text-zinc-500 mb-1">Token Balance</p>
-          <p className="text-2xl font-bold font-mono text-accent">
-            {formatNumber(tokenBalance)} <span className="text-sm text-zinc-500">{deployments.tokenSymbol}</span>
-          </p>
+          <p className="text-xs text-zinc-500 mb-1">Properties Held</p>
+          <p className="text-2xl font-bold font-mono text-accent">{owned.length}</p>
         </div>
         <div className="card flex items-center gap-3">
           {isVerified ? (
@@ -92,17 +102,22 @@ export default function PortfolioPage() {
           <h2 className="font-medium text-zinc-200">Holdings</h2>
         </div>
 
-        {tokenBalance > 0 ? (
-          <div className="flex items-center justify-between py-3 border-b border-surface-border">
-            <div>
-              <p className="text-sm font-medium text-zinc-200">{deployments.tokenName}</p>
-              <p className="text-xs text-zinc-500 font-mono">{deployments.tokenSymbol}</p>
+        {owned.length > 0 ? (
+          owned.map((h) => (
+            <div
+              key={h.address}
+              className="flex items-center justify-between py-3 border-b border-surface-border last:border-0"
+            >
+              <div>
+                <p className="text-sm font-medium text-zinc-200">{h.name}</p>
+                <p className="text-xs text-zinc-500 font-mono">{h.symbol}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-mono text-zinc-200">{formatNumber(h.balance)}</p>
+                <p className="text-xs text-zinc-500">${formatNumber(h.usd)}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-mono text-zinc-200">{formatNumber(tokenBalance)}</p>
-              <p className="text-xs text-zinc-500">${formatNumber(usdValue)}</p>
-            </div>
-          </div>
+          ))
         ) : (
           <p className="text-sm text-zinc-500 py-4 text-center">
             No holdings yet.{" "}
@@ -110,10 +125,6 @@ export default function PortfolioPage() {
               Browse properties
             </Link>
           </p>
-        )}
-
-        {isPaused && (
-          <p className="text-xs text-amber-400 mt-4">Token transfers are currently paused by the issuer.</p>
         )}
       </div>
     </div>

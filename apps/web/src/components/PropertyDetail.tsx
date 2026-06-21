@@ -20,10 +20,10 @@ import { useIdentityVerified } from "@/hooks/useIdentityVerified";
 import { IdentityGate } from "@/components/IdentityGate";
 import {
   deployments,
-  PROPERTY_SALE_ABI,
+  MULTI_PROPERTY_SALE_ABI,
   calcEthCost,
   formatEth,
-  isTrexDeployed,
+  getOnChainProperty,
   tokenPriceEth,
 } from "@/lib/contracts";
 
@@ -38,15 +38,17 @@ export function PropertyDetail({ property }: { property: Property }) {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [pendingBuy, setPendingBuy] = useState(false);
 
-  const onChainEnabled = property.slug === "koramangala-skyrise" && isTrexDeployed();
+  const onChain = getOnChainProperty(property.slug);
+  const onChainEnabled = onChain !== null;
   const validAmount = Number.isFinite(amount) && amount > 0;
   const tokenAmountWei = validAmount ? parseEther(String(amount)) : BigInt(0);
-  const ethCost = calcEthCost(amount);
+  const ethCost = calcEthCost(amount, onChain?.priceWei);
 
   const { data: tokensAvailable } = useReadContract({
-    address: deployments.propertySale as `0x${string}`,
-    abi: PROPERTY_SALE_ABI,
+    address: onChain?.sale as `0x${string}`,
+    abi: MULTI_PROPERTY_SALE_ABI,
     functionName: "tokensAvailable",
+    args: onChain ? [onChain.token as `0x${string}`] : undefined,
     chainId: deployments.chainId,
     query: { enabled: onChainEnabled },
   });
@@ -81,15 +83,15 @@ export function PropertyDetail({ property }: { property: Property }) {
   }, [isConfirmed, pendingBuy, writeHash, reset]);
 
   function handleBuy() {
-    if (!canInvest) return;
+    if (!canInvest || !onChain) return;
     setError(null);
     setStep("buy");
     setPendingBuy(true);
     writeContract({
-      address: deployments.propertySale as `0x${string}`,
-      abi: PROPERTY_SALE_ABI,
+      address: onChain.sale as `0x${string}`,
+      abi: MULTI_PROPERTY_SALE_ABI,
       functionName: "buy",
-      args: [tokenAmountWei],
+      args: [onChain.token as `0x${string}`, tokenAmountWei],
       value: ethCost,
       chainId: deployments.chainId,
     });
@@ -155,7 +157,7 @@ export function PropertyDetail({ property }: { property: Property }) {
               </div>
               <div>
                 <p className="text-xs text-zinc-500">Token Price</p>
-                <p className="text-lg font-semibold">{formatEth(tokenPriceEth())} ETH</p>
+                <p className="text-lg font-semibold">{formatEth(tokenPriceEth(onChain?.priceWei))} ETH</p>
               </div>
               <div>
                 <p className="text-xs text-zinc-500">Symbol</p>
@@ -180,7 +182,7 @@ export function PropertyDetail({ property }: { property: Property }) {
               <>
                 {!onChainEnabled && (
                   <p className="text-xs text-amber-400/80 text-center">
-                    Run <code className="font-mono">npm run deploy:local</code> to deploy T-REX suite.
+                    On-chain purchasing isn&apos;t available for this property yet.
                   </p>
                 )}
 
@@ -250,6 +252,24 @@ export function PropertyDetail({ property }: { property: Property }) {
                   </button>
                 )}
               </>
+            )}
+
+            {property.status === "funded" && (
+              <div className="rounded-lg bg-surface-overlay border border-surface-border p-4 text-center">
+                <p className="text-sm font-medium text-zinc-300">Sold out</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  This offering is fully funded — no tokens remaining.
+                </p>
+              </div>
+            )}
+
+            {property.status !== "active" && property.status !== "funded" && (
+              <div className="rounded-lg bg-surface-overlay border border-surface-border p-4 text-center">
+                <p className="text-sm font-medium text-zinc-300">Not available</p>
+                <p className="text-xs text-zinc-500 mt-1">
+                  This property isn&apos;t open for investment yet.
+                </p>
+              </div>
             )}
           </div>
         </div>
