@@ -32,7 +32,8 @@ type Step = "idle" | "buy" | "success" | "error";
 export function PropertyDetail({ property }: { property: Property }) {
   const { address, isConnected } = useAccount();
   const { isVerified, isWrongChain } = useIdentityVerified();
-  const [amount, setAmount] = useState(100);
+  const [amountInput, setAmountInput] = useState("100");
+  const amount = amountInput === "" ? 0 : Number(amountInput);
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -145,12 +146,12 @@ export function PropertyDetail({ property }: { property: Property }) {
           <div className="card">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="w-4 h-4 text-accent" />
-              <h3 className="font-medium text-zinc-200">Official ERC-3643 (T-REX) flow</h3>
+              <h3 className="font-medium text-zinc-200"> ERC-3643 (T-REX) flow</h3>
             </div>
             <ol className="text-sm text-zinc-500 space-y-2 list-decimal list-inside">
               <li>KYC → ONCHAINID claim + Identity Registry (demo issuer)</li>
               <li>Pay native ETH to treasury</li>
-              <li>Receive {property.tokenSymbol} via official T-REX token contract</li>
+              <li>Receive {property.tokenSymbol} via  T-REX token contract</li>
               <li>Compliance enforced on every transfer</li>
             </ol>
           </div>
@@ -217,11 +218,8 @@ export function PropertyDetail({ property }: { property: Property }) {
                     min={0.001}
                     step={0.001}
                     max={available}
-                    value={amount}
-                    onChange={(e) => {
-                      const next = e.target.value === "" ? 0 : Number(e.target.value);
-                      setAmount(next);
-                    }}
+                    value={amountInput}
+                    onChange={(e) => setAmountInput(e.target.value)}
                     disabled={step === "success" || isBusy}
                     className="input-field font-mono"
                   />
