@@ -202,15 +202,6 @@ export function PropertyDetail({ property }: { property: Property }) {
                   </p>
                 )}
 
-                {isConnected && !isWrongChain && (
-                  <div className="flex items-center justify-between rounded-lg bg-surface-overlay border border-surface-border px-4 py-2.5">
-                    <span className="text-xs text-zinc-500">Your ETH Balance</span>
-                    <span className="text-sm font-mono font-semibold text-zinc-200">
-                      {ethBalance ? formatEth(ethBalance.value) : "0.00"} ETH
-                    </span>
-                  </div>
-                )}
-
                 <div>
                   <label className="text-xs text-zinc-500 mb-2 block">Token Amount</label>
                   <input
@@ -226,7 +217,17 @@ export function PropertyDetail({ property }: { property: Property }) {
                 </div>
 
                 <div className="rounded-lg border border-surface-border p-4 space-y-2 text-sm">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">You pay</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">You pay</p>
+                    {isConnected && !isWrongChain && (
+                      <p className="text-xs text-zinc-500">
+                        Balance:{" "}
+                        <span className="font-mono text-zinc-300">
+                          {ethBalance ? formatEth(ethBalance.value) : "0.00"} ETH
+                        </span>
+                      </p>
+                    )}
+                  </div>
                   <p className="text-xl font-semibold text-zinc-100">
                     {formatEth(ethCost)} <span className="text-sm font-normal text-zinc-500">ETH</span>
                   </p>
