@@ -70,6 +70,13 @@ export function PropertyDetail({ property }: { property: Property }) {
       ? ((property.totalSupply - available) / property.totalSupply) * 100
       : ((property.totalSupply - property.availableTokens) / property.totalSupply) * 100;
 
+  const insufficientBalance =
+    isConnected &&
+    !isWrongChain &&
+    ethBalance !== undefined &&
+    validAmount &&
+    ethCost > ethBalance.value;
+
   const canInvest =
     property.status === "active" &&
     isConnected &&
@@ -78,6 +85,7 @@ export function PropertyDetail({ property }: { property: Property }) {
     onChainEnabled &&
     validAmount &&
     amount <= available &&
+    !insufficientBalance &&
     step !== "success";
 
   useEffect(() => {
@@ -256,12 +264,22 @@ export function PropertyDetail({ property }: { property: Property }) {
                 )}
 
                 {step !== "success" && onChainEnabled && (
-                  <button className="btn-primary w-full" disabled={!canInvest || isBusy} onClick={handleBuy}>
+                  <button
+                    className={`w-full ${
+                      insufficientBalance
+                        ? "flex items-center justify-center gap-2 rounded-lg bg-red-500/90 px-4 py-2.5 text-sm font-medium text-white cursor-not-allowed disabled:opacity-100"
+                        : "btn-primary"
+                    }`}
+                    disabled={!canInvest || isBusy}
+                    onClick={handleBuy}
+                  >
                     {isBusy ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Confirm in MetaMask…
                       </>
+                    ) : insufficientBalance ? (
+                      "Insufficient ETH balance"
                     ) : (
                       `Buy ${property.tokenSymbol} with ETH`
                     )}
