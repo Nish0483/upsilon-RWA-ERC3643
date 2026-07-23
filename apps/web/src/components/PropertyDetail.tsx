@@ -14,14 +14,13 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Property, formatUsd, formatNumber } from "@/lib/api";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther, formatEther } from "viem";
+import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { parseEther } from "viem";
 import { useIdentityVerified } from "@/hooks/useIdentityVerified";
 import { IdentityGate } from "@/components/IdentityGate";
 import {
   deployments,
   MULTI_PROPERTY_SALE_ABI,
-  TOKEN_ABI,
   calcEthCost,
   formatEth,
   getOnChainProperty,
@@ -54,16 +53,11 @@ export function PropertyDetail({ property }: { property: Property }) {
     query: { enabled: onChainEnabled },
   });
 
-  const { data: tokenBalance, refetch: refetchBalance } = useReadContract({
-    address: onChain?.token as `0x${string}`,
-    abi: TOKEN_ABI,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
+  const { data: ethBalance, refetch: refetchEthBalance } = useBalance({
+    address,
     chainId: deployments.chainId,
-    query: { enabled: onChainEnabled && !!address && !isWrongChain },
+    query: { enabled: !!address && !isWrongChain },
   });
-
-  const balance = tokenBalance ? Number(formatEther(tokenBalance)) : 0;
 
   const { writeContract, data: writeHash, isPending: isWritePending, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -91,9 +85,9 @@ export function PropertyDetail({ property }: { property: Property }) {
     setTxHash(writeHash ?? null);
     setStep("success");
     setPendingBuy(false);
-    refetchBalance();
+    refetchEthBalance();
     reset();
-  }, [isConfirmed, pendingBuy, writeHash, reset, refetchBalance]);
+  }, [isConfirmed, pendingBuy, writeHash, reset, refetchEthBalance]);
 
   function handleBuy() {
     if (!canInvest || !onChain) return;
@@ -199,11 +193,11 @@ export function PropertyDetail({ property }: { property: Property }) {
                   </p>
                 )}
 
-                {isConnected && onChainEnabled && !isWrongChain && (
+                {isConnected && !isWrongChain && (
                   <div className="flex items-center justify-between rounded-lg bg-surface-overlay border border-surface-border px-4 py-2.5">
-                    <span className="text-xs text-zinc-500">Your Balance</span>
+                    <span className="text-xs text-zinc-500">Your ETH Balance</span>
                     <span className="text-sm font-mono font-semibold text-zinc-200">
-                      {formatNumber(balance)} {property.tokenSymbol}
+                      {ethBalance ? formatEth(ethBalance.value) : "0.00"} ETH
                     </span>
                   </div>
                 )}
