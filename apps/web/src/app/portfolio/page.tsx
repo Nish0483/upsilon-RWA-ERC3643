@@ -4,15 +4,17 @@ import { useAccount, useReadContracts } from "wagmi";
 import { Wallet, ShieldCheck, ShieldX, Coins } from "lucide-react";
 import Link from "next/link";
 import deployments from "@/lib/deployments.json";
-import { TOKEN_ABI } from "@/lib/contracts";
+import { TOKEN_ABI, MULTI_PROPERTY_SALE_ABI } from "@/lib/contracts";
 import { formatNumber } from "@/lib/api";
-import { fallbackProperties } from "@/lib/fallback-data";
 import { formatEther } from "viem";
 import { useIdentityVerified } from "@/hooks/useIdentityVerified";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-// Every deployed property token, paired with catalog metadata (name + USD price).
+const fmtEth = (eth: number) =>
+  eth.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+// Every deployed property token.
 const tokenDefs = [
   { address: deployments.token, symbol: deployments.tokenSymbol, name: deployments.tokenName },
   {
@@ -22,23 +24,31 @@ const tokenDefs = [
   },
 ].filter((t) => t.address && t.address !== ZERO);
 
-const usdPriceBySymbol: Record<string, number> = Object.fromEntries(
-  fallbackProperties.map((p) => [p.tokenSymbol, p.tokenPrice])
-);
-
 export default function PortfolioPage() {
   const { address, isConnected } = useAccount();
   const { isVerified, isWrongChain, targetChainId } = useIdentityVerified();
 
-  const { data: balances } = useReadContracts({
-    contracts: tokenDefs.map((t) => ({
-      address: t.address as `0x${string}`,
-      abi: TOKEN_ABI,
-      functionName: "balanceOf",
-      args: address ? [address as `0x${string}`] : undefined,
-      chainId: deployments.chainId,
-    })),
-    query: { enabled: !!address && !isWrongChain },
+  const saleAddr = deployments.multiSale as `0x${string}`;
+
+  // Read each token balance plus its on-chain price from the shared sale.
+  const { data: results } = useReadContracts({
+    contracts: [
+      ...tokenDefs.map((t) => ({
+        address: t.address as `0x${string}`,
+        abi: TOKEN_ABI,
+        functionName: "balanceOf" as const,
+        args: address ? [address as `0x${string}`] : undefined,
+        chainId: deployments.chainId,
+      })),
+      ...tokenDefs.map((t) => ({
+        address: saleAddr,
+        abi: MULTI_PROPERTY_SALE_ABI,
+        functionName: "tokenPriceWei" as const,
+        args: [t.address as `0x${string}`],
+        chainId: deployments.chainId,
+      })),
+    ],
+    query: { enabled: !!address && !isWrongChain && saleAddr !== ZERO },
   });
 
   if (!isConnected) {
@@ -51,15 +61,18 @@ export default function PortfolioPage() {
     );
   }
 
+  const n = tokenDefs.length;
   const holdings = tokenDefs.map((t, i) => {
-    const raw = balances?.[i]?.result as bigint | undefined;
-    const balance = raw ? Number(formatEther(raw)) : 0;
-    const usd = (usdPriceBySymbol[t.symbol] ?? 0) * balance;
-    return { ...t, balance, usd };
+    const balRaw = results?.[i]?.result as bigint | undefined;
+    const priceRaw = results?.[n + i]?.result as bigint | undefined;
+    const balance = balRaw ? Number(formatEther(balRaw)) : 0;
+    const priceEth = priceRaw ? Number(formatEther(priceRaw)) : 0;
+    const valueEth = balance * priceEth;
+    return { ...t, balance, priceEth, valueEth };
   });
 
   const owned = holdings.filter((h) => h.balance > 0);
-  const totalValue = holdings.reduce((sum, h) => sum + h.usd, 0);
+  const totalValueEth = holdings.reduce((sum, h) => sum + h.valueEth, 0);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -75,7 +88,7 @@ export default function PortfolioPage() {
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         <div className="card">
           <p className="text-xs text-zinc-500 mb-1">Total Value</p>
-          <p className="text-2xl font-bold text-zinc-100">${formatNumber(totalValue)}</p>
+          <p className="text-2xl font-bold text-zinc-100">{fmtEth(totalValueEth)} ETH</p>
         </div>
         <div className="card">
           <p className="text-xs text-zinc-500 mb-1">Properties Held</p>
@@ -114,7 +127,7 @@ export default function PortfolioPage() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-mono text-zinc-200">{formatNumber(h.balance)}</p>
-                <p className="text-xs text-zinc-500">${formatNumber(h.usd)}</p>
+                <p className="text-xs text-zinc-500">{fmtEth(h.valueEth)} ETH</p>
               </div>
             </div>
           ))
